@@ -3,14 +3,15 @@
 // ============================================================================
 // Description: Protected route component using Redux authentication state
 // Author: Senior Software Engineer
-// Features: Auto-logout on no auth, redirect to login, session validation
+// Features: Auto-logout on no auth, redirect to login, session validation, MANDATORY PHONE COLLECTION
 // Architecture: Clean Code, OOP Principles, Type-Safe
 // ============================================================================
 
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { initializeAuth, selectIsAuthenticated, selectIsInitialized } from '@/store/slices/authSlice';
+import { initializeAuth, selectIsAuthenticated, selectIsInitialized, selectProfile, selectUser } from '@/store/slices/authSlice';
+import { PhoneNumberCollectionModal } from './auth/PhoneNumberCollectionModal';
 
 /**
  * Redux Auth Guard Component
@@ -20,6 +21,7 @@ import { initializeAuth, selectIsAuthenticated, selectIsInitialized } from '@/st
  * - Auto-logs out users with no valid session
  * - Redirects unauthenticated users to login page
  * - Preserves the attempted route for post-login redirect
+ * - ENFORCES MANDATORY PHONE NUMBER COLLECTION for authenticated users
  * 
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Protected content to render
@@ -34,10 +36,12 @@ export const ReduxAuthGuard: React.FC<ReduxAuthGuardProps> = ({ children }) => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Get authentication state from Redux
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isInitialized = useAppSelector(selectIsInitialized);
+  const profile = useAppSelector(selectProfile);
+  const user = useAppSelector(selectUser);
 
   // DEBUG: Log auth state (commented out for production)
   useEffect(() => {
@@ -74,7 +78,7 @@ export const ReduxAuthGuard: React.FC<ReduxAuthGuardProps> = ({ children }) => {
     // DON'T dispatch logout here - it causes infinite loop
     if (!isAuthenticated) {
       // console.log('🚫 Not authenticated, redirecting to login');
-      
+
       // Redirect to login with return URL
       navigate('/login', {
         replace: true,
@@ -100,44 +104,29 @@ export const ReduxAuthGuard: React.FC<ReduxAuthGuardProps> = ({ children }) => {
     return null;
   }
 
-  // User is authenticated, render protected content
-  return <>{children}</>;
+  // REQUIRE PHONE NUMBER
+  // If user is authenticated but has no phone number, show the mandatory collection modal
+  const hasPhone = profile?.phone && profile.phone.trim().length > 0;
+
+  // We render the children (app) anyway, but overlay the modal if phone is missing
+  // Or to be stricter, we could ONLY render the modal. 
+  // Rendering on top (overlay) allows the app to load in background which is fine, 
+  // but to prevent interaction, the modal should have a high z-index and backdrop.
+  // The PhoneNumberCollectionModal already has fixed inset-0 and high z-index.
+
+  return (
+    <>
+      {children}
+
+      {/* 
+        Mandatory Phone Number Collection Overlay 
+        Only shows if authenticated but missing phone number
+      */}
+      {!hasPhone && user?.id && (
+        <PhoneNumberCollectionModal />
+      )}
+    </>
+  );
 };
 
 export default ReduxAuthGuard;
-
-// ============================================================================
-// USAGE EXAMPLE
-// ============================================================================
-
-/**
- * Wrap protected routes with ReduxAuthGuard:
- * 
- * ```tsx
- * import { ReduxAuthGuard } from '@/components/ReduxAuthGuard';
- * 
- * function App() {
- *   return (
- *     <Routes>
- *       <Route path="/login" element={<Login />} />
- *       <Route
- *         path="/dashboard"
- *         element={
- *           <ReduxAuthGuard>
- *             <Dashboard />
- *           </ReduxAuthGuard>
- *         }
- *       />
- *     </Routes>
- *   );
- * }
- * ```
- * 
- * FEATURES:
- * - ✅ Checks Redux state for authentication
- * - ✅ Auto-logs out users with no session
- * - ✅ Redirects to login with return URL
- * - ✅ Shows loading spinner during auth check
- * - ✅ Prevents flash of protected content
- * - ✅ Type-safe with TypeScript
- */
