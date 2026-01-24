@@ -50,8 +50,6 @@ class AuthService {
    */
   private async cleanupOrphanedAuthUser(email: string): Promise<boolean> {
     try {
-      console.log('🔍 Checking for orphaned auth user:', email);
-
       // Check if profile exists
       const { data: existingProfile, error: _profileError } = await supabase
         .from('users')
@@ -61,16 +59,11 @@ class AuthService {
 
       // If profile exists, no cleanup needed
       if (existingProfile) {
-        console.log('✅ Profile exists, no cleanup needed');
         return false;
       }
 
-      // Profile doesn't exist - check if auth user exists
-      // We can't directly query auth.users, but we can try to sign in
-      // to detect if auth user exists without profile
-      console.warn('⚠️ Auth user may exist without profile - this is an orphaned user');
-      console.log('💡 User should use a different email or contact support to clean up');
-
+      // Profile doesn't exist - auth user may exist without profile
+      // User should use a different email or contact support for cleanup
       return false; // We can't auto-cleanup due to security - needs admin intervention
 
     } catch (err) {
@@ -103,7 +96,7 @@ class AuthService {
 
       // DEBUG: log signup payload to help troubleshoot missing phone numbers
       if (process.env.NODE_ENV === 'development') {
-        console.log('[AuthService] signUp payload:', signupPayload);
+
       }
 
       const { data: authData, error } = await supabase.auth.signUp(signupPayload as any);
@@ -128,14 +121,14 @@ class AuthService {
 
         // DEBUG: log RPC payload before calling create_user_profile_secure
         if (process.env.NODE_ENV === 'development') {
-          console.log('[AuthService] create_user_profile_secure payload:', rpcPayload);
+
         }
 
         const { data: profileResult, error: rpcError } = await supabase.rpc('create_user_profile_secure', rpcPayload as any);
 
         // DEBUG: log RPC result for troubleshooting
         if (process.env.NODE_ENV === 'development') {
-          console.log('[AuthService] create_user_profile_secure result:', { profileResult, rpcError });
+
         }
 
         if (rpcError) {
@@ -264,12 +257,12 @@ class AuthService {
 
       if (profile) {
         // Profile exists, return it
-        console.log('✅ OAuth user profile found:', profile);
+
         return { profile, error: null };
       }
 
       // Profile doesn't exist, create it using OAuth metadata
-      console.log('📝 Creating profile for OAuth user:', user.email);
+
 
       // Extract user metadata from OAuth provider
       const metadata = user.user_metadata || {};
@@ -325,7 +318,7 @@ class AuthService {
           };
         }
 
-        console.log('✅ OAuth user profile created successfully:', profile);
+
         return { profile, error: null };
 
       } catch (profileError) {
@@ -422,7 +415,7 @@ class AuthService {
           postal_code
         `)
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         return null;
@@ -689,7 +682,7 @@ class AuthService {
           userId,
           email
         });
-        console.log('📧 Login welcome email queued for:', email);
+
       } catch (error) {
         // Only log errors in development
         if (process.env.NODE_ENV === 'development') {

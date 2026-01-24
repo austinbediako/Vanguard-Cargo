@@ -27,17 +27,11 @@ StorageManager.monitor();
 
 // Initialize multi-tab synchronization
 tabSyncManager.initialize();
-console.log('🔄 Multi-tab synchronization initialized');
 
 // Initialize secure storage (encryption) and migrate sensitive data
 secureStorage.initialize().then(async () => {
-  console.log('🔐 Secure storage initialized');
-  
   // Migrate any existing sensitive data to encrypted storage
-  const migratedCount = await StorageManager.migrateSensitiveData();
-  if (migratedCount > 0) {
-    console.log(`✅ Migrated ${migratedCount} sensitive items to encrypted storage`);
-  }
+  await StorageManager.migrateSensitiveData();
 }).catch(error => {
   console.error('❌ Failed to initialize secure storage:', error);
 });
@@ -55,35 +49,11 @@ secureStorage.initialize().then(async () => {
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   // Import service worker registration from vite-plugin-pwa
   import('virtual:pwa-register').then(({ registerSW }) => {
-    const updateSW = registerSW({
-      // Called when new service worker is available
-      onNeedRefresh() {
-        console.log('🔄 New content available! Updating...');
-        // Show user notification (optional - auto-updates by default)
-        if (confirm('New version available! Reload to update?')) {
-          updateSW(true); // Force update
-        }
-      },
-      
-      // Called when app is ready to work offline
-      onOfflineReady() {
-        console.log('✅ App ready to work offline');
-        // Optional: Show toast notification
-        // toast.success('App is ready for offline use!');
-      },
-      
-      // Called when service worker registration fails
-      onRegisterError(error: Error) {
-        console.error('❌ Service Worker registration error:', error);
-      },
-      
-      // Auto-update interval (check every hour)
-      immediate: true,
+    registerSW({
+      immediate: true, // Auto-update
     });
-    
-    console.log('🚀 Service Worker registered successfully');
   }).catch((error) => {
-    console.error('Failed to import service worker:', error);
+    console.error('Service Worker error:', error);
   });
 }
 
@@ -114,36 +84,36 @@ createRoot(document.getElementById('root')!).render(
             <ThemeProvider>
               <PreferencesProvider>
                 <App />
-                  {/* SpeedInsights component for Vercel performance monitoring */}
-                  <SpeedInsights />
-                  {/* Toast Notifications */}
-                  <Toaster
-                    position="top-right"
-                    toastOptions={{
-                      duration: 5000,
-                      style: {
-                        background: '#ffffff',
-                        color: '#1f2937',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '0.75rem',
-                        padding: '16px',
+                {/* SpeedInsights component for Vercel performance monitoring */}
+                <SpeedInsights />
+                {/* Toast Notifications */}
+                <Toaster
+                  position="top-right"
+                  toastOptions={{
+                    duration: 5000,
+                    style: {
+                      background: '#ffffff',
+                      color: '#1f2937',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.75rem',
+                      padding: '16px',
+                    },
+                    success: {
+                      iconTheme: {
+                        primary: '#10b981',
+                        secondary: '#ffffff',
                       },
-                      success: {
-                        iconTheme: {
-                          primary: '#10b981',
-                          secondary: '#ffffff',
-                        },
+                    },
+                    error: {
+                      iconTheme: {
+                        primary: '#ef4444',
+                        secondary: '#ffffff',
                       },
-                      error: {
-                        iconTheme: {
-                          primary: '#ef4444',
-                          secondary: '#ffffff',
-                        },
-                      },
-                    }}
-                  />
-                </PreferencesProvider>
+                    },
+                  }}
+                />
+              </PreferencesProvider>
             </ThemeProvider>
           </BrowserRouter>
         </QueryClientProvider>

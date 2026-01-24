@@ -49,7 +49,7 @@ interface LoginCredentials {
 /**
  * Registration data interface
  */
-interface RegisterData extends SignUpData {}
+interface RegisterData extends SignUpData { }
 
 // ============================================================================
 // INITIAL STATE
@@ -90,7 +90,7 @@ export const initializeAuth = createAsyncThunk(
     try {
       // Check for existing session
       const { data: { session }, error } = await supabase.auth.getSession();
-      
+
       if (error) {
         throw error;
       }
@@ -105,37 +105,37 @@ export const initializeAuth = createAsyncThunk(
       // If profile doesn't exist, this might be an OAuth sign-in
       // Try to create the profile automatically
       if (!profile) {
-        console.log('⚠️ Profile not found - attempting OAuth profile creation');
+
         const oauthResult = await authService.handleOAuthSignIn(session.user);
-        
+
         if (oauthResult.error) {
           console.error('❌ Failed to create OAuth profile:', oauthResult.error);
           throw new Error(oauthResult.error.message || 'Profile not found');
         }
-        
+
         profile = oauthResult.profile;
-        
+
         if (!profile) {
           throw new Error('Profile not found');
         }
-        
-        console.log('✅ OAuth profile created successfully');
+
+
       }
 
       // Check account status on initialization (e.g., page refresh)
       const accountStatus = profile.status?.toLowerCase();
-      console.log('🔍 Init - Account status check:', accountStatus);
+
 
       if (accountStatus !== 'active') {
         // Sign out the user immediately if not active
         await supabase.auth.signOut();
-        console.warn('🚫 Account not active - user signed out');
-        
+
+
         // Return null instead of throwing to prevent initialization loop
         return null;
       }
 
-      console.log('✅ Init - Account is active');
+
 
       return {
         user: session.user,
@@ -168,7 +168,7 @@ export const loginUser = createAsyncThunk(
         throw new Error(error?.message || 'Login failed');
       }
 
-      console.log('🔐 User signed in:', user.id);
+
 
       // Get user profile from database using authService for consistent field mapping
       const profile = await authService.getUserProfile(user.id);
@@ -177,8 +177,8 @@ export const loginUser = createAsyncThunk(
 
       if (!profile) {
         // Profile not found - try to create it from user metadata
-        console.warn('Profile not found, attempting to create...');
-        
+
+
         const { error: createError } = await authService.createUserProfile(
           user.id,
           user.email || '',
@@ -192,19 +192,19 @@ export const loginUser = createAsyncThunk(
 
         // Retry getting profile after creation
         const newProfile = await authService.getUserProfile(user.id);
-        
+
         if (!newProfile) {
           throw new Error('Profile could not be loaded. Please contact support.');
         }
 
         // Check account status BEFORE allowing login
         const accountStatus = newProfile.status?.toLowerCase();
-        console.log('🔍 Account status check:', accountStatus);
+
 
         if (accountStatus !== 'active') {
           // Sign out the user immediately
           await supabase.auth.signOut();
-          
+
           // Throw specific error based on status
           if (accountStatus === 'inactive') {
             throw new Error('Your account is currently inactive. Please contact support@vanguardcargo.co for assistance.');
@@ -227,12 +227,12 @@ export const loginUser = createAsyncThunk(
 
       // Check account status BEFORE allowing login
       const accountStatus = profile.status?.toLowerCase();
-      console.log('🔍 Account status check:', accountStatus);
+
 
       if (accountStatus !== 'active') {
         // Sign out the user immediately
         await supabase.auth.signOut();
-        
+
         // Throw specific error based on status
         if (accountStatus === 'inactive') {
           throw new Error('Your account is currently inactive. Please contact support@vanguardcargo.co for assistance.');
@@ -247,7 +247,7 @@ export const loginUser = createAsyncThunk(
         }
       }
 
-      console.log('✅ Account is active - login allowed');
+
 
       return {
         user,
@@ -356,8 +356,18 @@ export const updateUserProfile = createAsyncThunk(
       // Get updated profile with properly mapped fields
       const profile = await authService.getUserProfile(userId);
 
+      // If profile fetch fails, just merge updates into existing profile
       if (!profile) {
-        throw new Error('Profile not found after update');
+        const existingProfile = state.auth.profile;
+        if (!existingProfile) {
+          throw new Error('Profile not found after update');
+        }
+
+        // Merge updates into existing profile
+        return {
+          ...existingProfile,
+          ...updates
+        };
       }
 
       return profile;
@@ -450,21 +460,15 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
-        console.log('🔐 Login fulfilled - Setting auth state:', {
-          user: !!action.payload.user,
-          profile: !!action.payload.profile
-        });
         state.isLoading = false;
         state.user = action.payload.user;
         state.profile = action.payload.profile;
         state.isAuthenticated = true;
         state.isInitialized = true;
         state.error = null;
-        console.log('✅ Auth state updated - isAuthenticated:', state.isAuthenticated);
-        
+
         // Broadcast login to other tabs for synchronization
         broadcastLogin({ user: action.payload.user, profile: action.payload.profile });
-        console.log('📡 Login broadcasted to other tabs');
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -507,7 +511,7 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.isInitialized = false;
         state.error = null;
-        console.log('✅ Logout fulfilled - Auth state cleared');
+
       })
       .addCase(logoutUser.rejected, (state, action) => {
         // Clear auth state even on logout failure (critical!)
@@ -517,7 +521,7 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.isInitialized = false;
         state.error = action.payload as string;
-        console.warn('⚠️ Logout rejected but state cleared anyway');
+
       });
 
     // Update profile
