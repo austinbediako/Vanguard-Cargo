@@ -11,29 +11,9 @@ interface PhoneNumberCollectionModalProps { }
 export const PhoneNumberCollectionModal: React.FC<PhoneNumberCollectionModalProps> = () => {
 	const dispatch = useAppDispatch();
 	const [phone, setPhone] = useState('');
-	const [country, setCountry] = useState<any>('GH'); // Default to Ghana
+	const country = 'GH'; // Default to Ghana
 	const [error, setError] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
-
-	// Auto-detect country based on IP
-	React.useEffect(() => {
-		const detectCountry = async () => {
-			try {
-				const response = await fetch('https://ipapi.co/json/');
-				if (response.ok) {
-					const data = await response.json();
-					if (data.country_code) {
-						setCountry(data.country_code);
-					}
-				}
-			} catch (error) {
-				console.warn('Failed to detect country:', error);
-				// Fallback to GH is already set in initial state
-			}
-		};
-
-		detectCountry();
-	}, []);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
