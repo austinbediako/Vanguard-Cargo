@@ -85,3 +85,6 @@ package-lock.json
 .netlify
 .firebase/
 firebase-debug.log*
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.agent/rules/snyk_rules.md
