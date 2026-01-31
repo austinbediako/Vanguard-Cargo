@@ -25,13 +25,13 @@ import GoogleAuthButton from '../../components/auth/GoogleAuthButton';
  * 
  */
 declare global {
-  interface Window {
-    grecaptcha?: {
-      ready: (callback: () => void) => void;
-      execute: (siteKey: string, options: { action: string }) => Promise<string>;
-      render: (container: string | HTMLElement, parameters: object) => number;
-    };
-  }
+	interface Window {
+		grecaptcha?: {
+			ready: (callback: () => void) => void;
+			execute: (siteKey: string, options: { action: string }) => Promise<string>;
+			render: (container: string | HTMLElement, parameters: object) => number;
+		};
+	}
 }
 
 /**
@@ -45,10 +45,10 @@ export default function Login() {
 	const isLoading = useAppSelector(selectIsLoading);
 	const navigate = useNavigate();
 	const location = useLocation();
-	
+
 	// State to control whether email form is shown
 	const [showEmailForm, setShowEmailForm] = useState(false);
-	
+
 	// Form state variables
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
@@ -58,11 +58,11 @@ export default function Login() {
 	const [showResendVerification, setShowResendVerification] = useState(false);
 	const [isResending, setIsResending] = useState(false);
 	const [resendMessage, setResendMessage] = useState("");
-	
+
 	// Email verification banner state
 	const [showEmailVerificationBanner, setShowEmailVerificationBanner] = useState(false);
 	const [verificationEmail, setVerificationEmail] = useState("");
-	
+
 	// reCAPTCHA state
 	const [captchaValue, setCaptchaValue] = useState<string | null>(null);
 	const [recaptchaError, setRecaptchaError] = useState(false);
@@ -92,7 +92,7 @@ export default function Login() {
 		try {
 			const { authService } = await import('../../services/authService');
 			const result = await authService.resendEmailVerification(emailAddress);
-			
+
 			if (result.error) {
 				return {
 					success: false,
@@ -128,7 +128,7 @@ export default function Login() {
 		try {
 			const { authService } = await import('../../services/authService');
 			const result = await authService.resendEmailVerification(email);
-			
+
 			if (result.error) {
 				setError(result.error || 'Failed to resend verification email');
 			} else {
@@ -141,7 +141,7 @@ export default function Login() {
 			setIsResending(false);
 		}
 	};
-	
+
 	/**
 	 * Check URL parameters for email verification notification
 	 * Display banner if user came from registration
@@ -150,7 +150,7 @@ export default function Login() {
 		const urlParams = new URLSearchParams(location.search);
 		const fromRegistration = urlParams.get('from') === 'registration';
 		const emailParam = urlParams.get('email');
-		
+
 		if (fromRegistration && emailParam) {
 			// Show email verification banner
 			setShowEmailVerificationBanner(true);
@@ -177,7 +177,7 @@ export default function Login() {
 			script.src = `https://www.google.com/recaptcha/api.js`;
 			script.async = true;
 			script.defer = true;
-			
+
 			// Add onload handler to detect successful script loading
 			script.onload = () => {
 				console.log('✅ reCAPTCHA script loaded successfully');
@@ -196,13 +196,13 @@ export default function Login() {
 					}
 				}, 800); // Reduced delay
 			};
-			
+
 			// Add error handler
 			script.onerror = () => {
 				console.error('❌ Failed to load reCAPTCHA script');
 				setRecaptchaError(true);
 			};
-			
+
 			// Append to document
 			document.head.appendChild(script);
 			console.log('📝 reCAPTCHA script injected (without callback)');
@@ -247,7 +247,7 @@ export default function Login() {
 
 		// STEP 1: Check rate limit (brute force protection)
 		const rateLimitStatus = loginRateLimiter.checkLimit(email);
-		
+
 		if (!rateLimitStatus.allowed) {
 			// Rate limit exceeded - show error and block login
 			setError(rateLimitStatus.message || 'Too many login attempts. Please try again later.');
@@ -281,10 +281,10 @@ export default function Login() {
 
 			// Login immediately (don't wait for status check)
 			const result = await dispatch(loginUser({ email, password })).unwrap();
-			
+
 			// Login successful - Redux will handle state updates
 			console.log('✅ Login successful!', result);
-			
+
 			// Clear errors and rate limit warnings
 			setError("");
 			setShowResendVerification(false);
@@ -292,30 +292,41 @@ export default function Login() {
 			setIsCheckingStatus(false);
 			setRateLimitWarning(null);
 			setRemainingAttempts(null);
-			
+
 			// Navigate immediately (Redux Persist handles state save automatically)
-			const from = (location.state as { from?: string })?.from || '/app/dashboard';
+			const requestedPath = (location.state as { from?: string })?.from || '/app/dashboard';
+			// Validate redirect path to prevent open redirect attacks
+			const isSafeRedirect = (path: string): boolean => {
+				// Must start with / and not contain // (to prevent protocol-relative URLs)
+				// Must not contain : before / (to prevent http:, javascript:, etc.)
+				if (!path.startsWith('/') || path.startsWith('//')) return false;
+				if (path.indexOf(':') !== -1 && path.indexOf(':') < path.indexOf('/')) return false;
+				// Block common malicious patterns
+				if (path.toLowerCase().includes('javascript:')) return false;
+				return true;
+			};
+			const from = isSafeRedirect(requestedPath) ? requestedPath : '/app/dashboard';
 			navigate(from, { replace: true });
-			
+
 		} catch (err: any) {
 			// STEP 2: Record failed login attempt for rate limiting
 			loginRateLimiter.recordAttempt(email);
-			
+
 			// Stop loading state
 			setIsCheckingStatus(false);
-			
+
 			// Handle login errors
 			const errorMessage = err?.message || String(err);
 			const lowerErrorMessage = errorMessage.toLowerCase();
-			
+
 			console.error('❌ Login error:', errorMessage);
-			
+
 			// Check if error is about account status
-			if (lowerErrorMessage.includes('inactive') || 
-			    lowerErrorMessage.includes('suspended') || 
-			    lowerErrorMessage.includes('reported') ||
-			    lowerErrorMessage.includes('under review')) {
-				
+			if (lowerErrorMessage.includes('inactive') ||
+				lowerErrorMessage.includes('suspended') ||
+				lowerErrorMessage.includes('reported') ||
+				lowerErrorMessage.includes('under review')) {
+
 				// Get account status info from the pre-check (if available)
 				try {
 					const statusCheck = await statusCheckPromise;
@@ -331,12 +342,12 @@ export default function Login() {
 				} catch {
 					// Fallback if status check failed
 				}
-				
+
 				// Fallback: Determine status from error message
 				let status = 'inactive';
 				if (lowerErrorMessage.includes('suspended')) status = 'suspended';
 				else if (lowerErrorMessage.includes('reported') || lowerErrorMessage.includes('under review')) status = 'reported';
-				
+
 				// Show modal
 				setAccountStatusInfo({
 					status: status,
@@ -346,26 +357,26 @@ export default function Login() {
 				setShowStatusWarning(true);
 				return;
 			}
-			
+
 			// Check for specific error types
-			if (lowerErrorMessage.includes('email not confirmed') || 
-			    lowerErrorMessage.includes('not verified') || 
-			    lowerErrorMessage.includes('confirm your email') ||
+			if (lowerErrorMessage.includes('email not confirmed') ||
+				lowerErrorMessage.includes('not verified') ||
+				lowerErrorMessage.includes('confirm your email') ||
 				lowerErrorMessage.includes('verify your email')) {
 				// Show email verification banner
 				setShowEmailVerificationBanner(true);
 				setVerificationEmail(email);
 				setError("Your email address is not verified. Please check your email and click the verification link.");
 				setShowResendVerification(true);
-			} else if (lowerErrorMessage.includes('invalid_credentials') || 
-			          lowerErrorMessage.includes('invalid login') ||
-			          lowerErrorMessage.includes('invalid') ||
-			          lowerErrorMessage.includes('wrong password')) {
+			} else if (lowerErrorMessage.includes('invalid_credentials') ||
+				lowerErrorMessage.includes('invalid login') ||
+				lowerErrorMessage.includes('invalid') ||
+				lowerErrorMessage.includes('wrong password')) {
 				setError("Invalid email or password. Please check your credentials and try again.");
 				setShowResendVerification(false);
 				setShowEmailVerificationBanner(false);
-			} else if (lowerErrorMessage.includes('too_many_requests') || 
-			          lowerErrorMessage.includes('rate limit')) {
+			} else if (lowerErrorMessage.includes('too_many_requests') ||
+				lowerErrorMessage.includes('rate limit')) {
 				setError("Too many login attempts. Please wait a few minutes before trying again.");
 				setShowResendVerification(false);
 				setShowEmailVerificationBanner(false);
@@ -398,7 +409,7 @@ export default function Login() {
 					<div className="w-full lg:w-1/2 bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center p-8" style={{ backgroundImage: `url(${DeliveryImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
 						<div className="w-32 h-32 mx-auto mb-6 bg-white/20 rounded-full flex items-center justify-center">
 							<svg className="w-20 h-20" fill="none" viewBox="0 0 24 24">
-								<path d="M19 7h-3V6a4 4 0 0 0-8 0v1H5a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8a1 1 0 0 0-1-1zM10 6a2 2 0 0 1 4 0v1h-4V6zm8 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V9h2v1a1 1 0 0 0 2 0V9h4v1a1 1 0 0 0 2 0V9h2v10z"/>
+								<path d="M19 7h-3V6a4 4 0 0 0-8 0v1H5a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8a1 1 0 0 0-1-1zM10 6a2 2 0 0 1 4 0v1h-4V6zm8 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V9h2v1a1 1 0 0 0 2 0V9h4v1a1 1 0 0 0 2 0V9h2v10z" />
 							</svg>
 						</div>
 						<h3 className="text-2xl font-bold mb-2 text-transparent">Secure cargo</h3>
@@ -415,10 +426,10 @@ export default function Login() {
 
 							{/* Google OAuth Button */}
 							<div className="mb-6">
-								<GoogleAuthButton 
+								<GoogleAuthButton
 									buttonText="Continue with Google"
 								/>
-								
+
 								{/* Divider */}
 								<div className="relative my-6">
 									<div className="absolute inset-0 flex items-center">
@@ -446,189 +457,188 @@ export default function Login() {
 
 							{/* Email Login Form - Only shown when Continue with Email is clicked */}
 							{showEmailForm && (
-							<form onSubmit={handleSubmit} className="space-y-6">
-								{/* Email Verification Banner */}
-								{showEmailVerificationBanner && verificationEmail && (
-									<EmailVerificationBanner
-										email={verificationEmail}
-										onResendVerification={handleBannerResendVerification}
-										onDismiss={() => setShowEmailVerificationBanner(false)}
-										dismissible={true}
-									/>
-								)}
+								<form onSubmit={handleSubmit} className="space-y-6">
+									{/* Email Verification Banner */}
+									{showEmailVerificationBanner && verificationEmail && (
+										<EmailVerificationBanner
+											email={verificationEmail}
+											onResendVerification={handleBannerResendVerification}
+											onDismiss={() => setShowEmailVerificationBanner(false)}
+											dismissible={true}
+										/>
+									)}
 
-								{/* Error Message */}
-								{error && (
-									<div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-										{error}
-										{rateLimitWarning && (
-											<div className="mt-2 flex items-center gap-2 text-sm">
-												<Shield className="w-4 h-4" />
-												<span>Try again in: <strong>{rateLimitWarning}</strong></span>
-											</div>
-										)}
-									</div>
-								)}
+									{/* Error Message */}
+									{error && (
+										<div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+											{error}
+											{rateLimitWarning && (
+												<div className="mt-2 flex items-center gap-2 text-sm">
+													<Shield className="w-4 h-4" />
+													<span>Try again in: <strong>{rateLimitWarning}</strong></span>
+												</div>
+											)}
+										</div>
+									)}
 
-								{/* Rate Limit Warning */}
-								{remainingAttempts !== null && remainingAttempts <= 2 && !error && (
-									<div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
-										<div className="flex items-center gap-2">
-											<Shield className="w-5 h-5 flex-shrink-0" />
-											<div>
-												<p className="font-semibold">Security Notice</p>
-												<p className="text-sm mt-1">
-													You have <strong>{remainingAttempts}</strong> login {remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining before temporary lockout.
-												</p>
+									{/* Rate Limit Warning */}
+									{remainingAttempts !== null && remainingAttempts <= 2 && !error && (
+										<div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+											<div className="flex items-center gap-2">
+												<Shield className="w-5 h-5 flex-shrink-0" />
+												<div>
+													<p className="font-semibold">Security Notice</p>
+													<p className="text-sm mt-1">
+														You have <strong>{remainingAttempts}</strong> login {remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining before temporary lockout.
+													</p>
+												</div>
 											</div>
 										</div>
-									</div>
-								)}
+									)}
 
-								{/* Resend Verification (Legacy - kept for backward compatibility) */}
-								{showResendVerification && !showEmailVerificationBanner && (
-									<div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg">
-										<p className="text-sm mb-3">
-											<strong>Email verification required.</strong> Check your inbox for the verification link, or request a new one:
-										</p>
-										<button
-											type="button"
-											onClick={handleResendVerification}
-											disabled={isResending || !email}
-											className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-										>
-											{isResending ? 'Sending...' : 'Resend Verification Email'}
-										</button>
-									</div>
-								)}
+									{/* Resend Verification (Legacy - kept for backward compatibility) */}
+									{showResendVerification && !showEmailVerificationBanner && (
+										<div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg">
+											<p className="text-sm mb-3">
+												<strong>Email verification required.</strong> Check your inbox for the verification link, or request a new one:
+											</p>
+											<button
+												type="button"
+												onClick={handleResendVerification}
+												disabled={isResending || !email}
+												className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+											>
+												{isResending ? 'Sending...' : 'Resend Verification Email'}
+											</button>
+										</div>
+									)}
 
-								{/* Success Message for Resend (Legacy) */}
-								{resendMessage && !showEmailVerificationBanner && (
-									<div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-										{resendMessage}
-									</div>
-								)}
+									{/* Success Message for Resend (Legacy) */}
+									{resendMessage && !showEmailVerificationBanner && (
+										<div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+											{resendMessage}
+										</div>
+									)}
 
-								{/* Email Field */}
-								<div>
-									<label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-										Email Address *
-									</label>
-									<input
-										type="email"
-										id="email"
-										value={email}
-										onChange={(e) => setEmail(e.target.value)}
-										placeholder="you@example.com"
-										className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 outline-none"
-										required
-									/>
-								</div>
-
-								{/* Password Field */}
-								<div>
-									<label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-										Password *
-									</label>
-									<div className="relative">
+									{/* Email Field */}
+									<div>
+										<label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+											Email Address *
+										</label>
 										<input
-											type={showPassword ? "text" : "password"}
-											id="password"
-											value={password}
-											onChange={(e) => setPassword(e.target.value)}
-											placeholder="••••••••"
-											className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 outline-none"
+											type="email"
+											id="email"
+											value={email}
+											onChange={(e) => setEmail(e.target.value)}
+											placeholder="you@example.com"
+											className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 outline-none"
 											required
 										/>
-										<button
-											type="button"
-											className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-											onClick={() => setShowPassword(!showPassword)}
-										>
-											{showPassword ? (
-												<EyeOff className="w-5 h-5" />
-											) : (
-												<Eye className="w-5 h-5" />
-											)}
-										</button>
 									</div>
-								</div>
 
-								{/* Remember Me & Forgot Password */}
-								<div className="flex items-center justify-between">
-									<label className="flex items-center space-x-2 cursor-pointer">
-										<input
-											type="checkbox"
-											checked={rememberMe}
-											onChange={(e) => setRememberMe(e.target.checked)}
-											className="w-4 h-4 text-red-500 border-gray-300 rounded focus:ring-red-500"
-										/>
-										<span className="text-sm text-gray-700">Remember Me</span>
-									</label>
-
-									{/* Link to Forgot Password page */}
-									<Link
-										to="/forgot-password"
-										className="text-sm text-red-500 hover:text-red-600 font-medium transition-colors"
-									>
-										Forgot password?
-									</Link>
-								</div>
-
-								{/* Google reCAPTCHA */}
-								{recaptchaConfig.enabled && recaptchaConfig.siteKey && (
-									<div className="recaptcha-container">
-										<ReCAPTCHA
-											ref={recaptchaRef}
-											sitekey={recaptchaConfig.siteKey}
-											theme={recaptchaConfig.theme}
-											size={recaptchaConfig.size}
-											onChange={handleCaptchaChange}
-											onExpired={handleCaptchaExpired}
-											onErrored={handleCaptchaError}
-											className="mt-2 mb-2"
-										/>
+									{/* Password Field */}
+									<div>
+										<label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+											Password *
+										</label>
+										<div className="relative">
+											<input
+												type={showPassword ? "text" : "password"}
+												id="password"
+												value={password}
+												onChange={(e) => setPassword(e.target.value)}
+												placeholder="••••••••"
+												className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 outline-none"
+												required
+											/>
+											<button
+												type="button"
+												className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+												onClick={() => setShowPassword(!showPassword)}
+											>
+												{showPassword ? (
+													<EyeOff className="w-5 h-5" />
+												) : (
+													<Eye className="w-5 h-5" />
+												)}
+											</button>
+										</div>
 									</div>
-								)}
 
-								{/* Submit Button */}
-								<button
-									type="submit"
-									disabled={!isFormValid || isSubmitting}
-									className={`w-full font-semibold px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
-										isFormValid && !isSubmitting
-											? "bg-red-500 hover:bg-red-600 text-white transform hover:scale-105 hover:shadow-lg"
-											: "bg-gray-300 text-gray-500 cursor-not-allowed"
-									}`}
-								>
-									{isSubmitting ? (
-										<>
-											<Loader2 className="w-5 h-5 animate-spin" />
-											<span>
-												{isCheckingStatus ? 'Checking account...' : 'Signing in...'}
-											</span>
-										</>
-									) : (
-										"Sign In"
-									)}
-								</button>
+									{/* Remember Me & Forgot Password */}
+									<div className="flex items-center justify-between">
+										<label className="flex items-center space-x-2 cursor-pointer">
+											<input
+												type="checkbox"
+												checked={rememberMe}
+												onChange={(e) => setRememberMe(e.target.checked)}
+												className="w-4 h-4 text-red-500 border-gray-300 rounded focus:ring-red-500"
+											/>
+											<span className="text-sm text-gray-700">Remember Me</span>
+										</label>
 
-								{/* Register Link */}
-								<div className="text-center pt-4">
-									<p className="text-sm text-gray-600">
-										Don't have an account?{' '}
-										{/* Link to Register page */}
+										{/* Link to Forgot Password page */}
 										<Link
-											to="/register"
-											className="text-red-500 hover:text-red-600 font-medium transition-colors"
+											to="/forgot-password"
+											className="text-sm text-red-500 hover:text-red-600 font-medium transition-colors"
 										>
-											Register
+											Forgot password?
 										</Link>
-									</p>
-								</div>
+									</div>
 
-								
-							</form>
+									{/* Google reCAPTCHA */}
+									{recaptchaConfig.enabled && recaptchaConfig.siteKey && (
+										<div className="recaptcha-container">
+											<ReCAPTCHA
+												ref={recaptchaRef}
+												sitekey={recaptchaConfig.siteKey}
+												theme={recaptchaConfig.theme}
+												size={recaptchaConfig.size}
+												onChange={handleCaptchaChange}
+												onExpired={handleCaptchaExpired}
+												onErrored={handleCaptchaError}
+												className="mt-2 mb-2"
+											/>
+										</div>
+									)}
+
+									{/* Submit Button */}
+									<button
+										type="submit"
+										disabled={!isFormValid || isSubmitting}
+										className={`w-full font-semibold px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${isFormValid && !isSubmitting
+												? "bg-red-500 hover:bg-red-600 text-white transform hover:scale-105 hover:shadow-lg"
+												: "bg-gray-300 text-gray-500 cursor-not-allowed"
+											}`}
+									>
+										{isSubmitting ? (
+											<>
+												<Loader2 className="w-5 h-5 animate-spin" />
+												<span>
+													{isCheckingStatus ? 'Checking account...' : 'Signing in...'}
+												</span>
+											</>
+										) : (
+											"Sign In"
+										)}
+									</button>
+
+									{/* Register Link */}
+									<div className="text-center pt-4">
+										<p className="text-sm text-gray-600">
+											Don't have an account?{' '}
+											{/* Link to Register page */}
+											<Link
+												to="/register"
+												className="text-red-500 hover:text-red-600 font-medium transition-colors"
+											>
+												Register
+											</Link>
+										</p>
+									</div>
+
+
+								</form>
 							)}
 						</div>
 					</div>
